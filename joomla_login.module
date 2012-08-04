@@ -1,0 +1,114 @@
+<?php
+
+/**
+ * Display help and module information
+ * @param path which path of the site we're displaying help
+ * @param arg array that holds the current path as would be returned from arg() function
+ * @return help text for the path
+ */
+function joomla_login_help($path, $arg) {
+  $output = "";
+  switch ($path) {
+  case "admin/help/jooml_module":
+    $output = '<p>' . t("Overrides default Drupal login system.") . '</p>';
+    break;
+  }
+  return $output;
+}
+
+
+/**
+ * Valid permissions for this module
+ * @return array An array of valid permissions for the joomla_login module
+ */
+function joomla_login_perm() {
+  return array('administer joomla_login');
+}
+
+
+/**
+ * Implementation of hook_module_init().
+ */
+function joomla_login_init() {
+  module_load_include('inc', 'joomla_login', 'crypt');
+}
+
+
+/**
+ * Implementation of hook_menu().
+ */
+function joomla_login_menu() {
+  $items = array();
+
+  $items['joomla_login/test'] = array(
+    'page callback' => 'joomla_login_test',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+
+/**
+ * Test to check that module installation works
+ */
+function joomla_login_test() {
+  return "content";
+}
+
+
+/**
+ * Implementation of hool_user().
+ * This method listens on 'insert' and 'after_update' operation and creates salted password
+ * based on joomla password standerd and updates the user row with the salted password
+ */
+function joomla_login_user($op, &$edit, &$account, $category = NULL){
+  if( ($op == "insert" || $op == "after_update") && $account->uid != 1){
+    $pass = $edit['pass'];
+    create_password($pass, $account->uid);
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ * This method finds user login forms and sets  joomla_login_authenticate_validate method as validatior callback
+ */
+function joomla_login_form_alter(&$form, &$form_state, $form_id){
+  if($form_id == 'user_login' || $form_id == 'user_login_block'){
+    $form['#validate'] = array('user_login_name_validate', 'joomla_login_authenticate_validate', 'user_login_final_validate');
+  }
+}
+
+
+function joomla_login_authenticate_validate($form, &$form_state) {
+  joomla_login_user_authenticate($form_state['values']);
+}
+
+
+/**
+ * This method is modified version of user_authenticate() method. It loads user by name at first
+ * then matches with the salted password.
+ * @see user_authenticate()
+ */
+function joomla_login_user_authenticate($form_values = array()) {
+  global $user;
+
+  //load user by name and check that user is denied
+  $account = user_load(array('name' => $form_values['name'], 'status' => 1));
+  if ($account && drupal_is_denied('mail', $account->mail)) {
+    form_set_error('name', t('The name %name is registered using a reserved e-mail address and therefore could not be logged in.', array('%name' => $account->name)));
+  }
+
+  //match password and check for errors
+  $password_match = check_password($account->pass, $form_values['pass']);
+
+  if (!form_get_errors() && !empty($form_values['name']) && $password_match && $account) {
+    $user = $account;
+    user_authenticate_finalize($form_values);
+    return $user;
+  }
+  else {
+    watchdog('user', 'Login attempt failed for %user.', array('%user' => $form_values['name']));
+  }
+}

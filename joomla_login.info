@@ -1,0 +1,4 @@
+name = Joomla Login System
+description = This module overrides Drupal's default login system. The new auth system is compatible with Joomla 1.5 login system.
+core = 6.x
+package = "Auth"

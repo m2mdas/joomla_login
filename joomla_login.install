@@ -1,0 +1,9 @@
+<?php
+
+function joomla_login_install() {
+  db_query("ALTER TABLE  {users} CHANGE  `pass`  `pass` VARCHAR( 128 )");
+}
+
+function joomla_login_uninstall() {
+
+}
